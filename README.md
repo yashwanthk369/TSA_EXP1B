@@ -11,19 +11,99 @@ To perform regular differncing,seasonal adjustment and log transformatio on inte
 5. Display the overall results.
 ### PROGRAM:
 
+```
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+data = pd.read_csv("sensor-fault-detection.csv", sep=';')
+
+data.columns = data.columns.str.strip().str.lower()
+print("Columns:", data.columns)
+
+data['timestamp'] = pd.to_datetime(data['timestamp'], errors='coerce')
+
+data = data.dropna(subset=['timestamp'])
+
+if 'sensorid' in data.columns:
+    sensor_id = 1
+    data = data[data['sensorid'] == sensor_id]
+    print(f"Filtered for sensor ID: {sensor_id}")
+
+data.set_index('timestamp', inplace=True)
+data = data.sort_index()
+
+data = data[~data.index.duplicated(keep='first')]
+
+data = data.resample('D').mean().interpolate()
+
+col = 'value'
+print("Using column:", col)
+
+data['value_diff'] = data[col] - data[col].shift(1)
+
+result = seasonal_decompose(data[col].dropna(), model='additive', period=30)
+data['value_sea_diff'] = result.resid
+
+min_val = data[col].min()
+if min_val <= 0:
+    shift_val = abs(min_val) + 1.0
+    data['value_log'] = np.log(data[col] + shift_val)
+    print(f"Values shifted by {shift_val} to enable log transformation.")
+else:
+    data['value_log'] = np.log(data[col])
+
+data['value_log_diff'] = data['value_log'] - data['value_log'].shift(1)
+
+result2 = seasonal_decompose(data['value_log_diff'].dropna(), model='additive', period=30)
+data['value_log_seasonal_diff'] = result2.resid
+
+plt.figure(figsize=(16, 16))
+
+plt.subplot(6, 1, 1)
+plt.plot(data[col])
+plt.title('Original Sensor Value')
+
+plt.subplot(6, 1, 2)
+plt.plot(data['value_diff'])
+plt.title('Regular Differencing')
+
+plt.subplot(6, 1, 3)
+plt.plot(data['value_sea_diff'])
+plt.title('Seasonal Adjustment (Residuals)')
+
+plt.subplot(6, 1, 4)
+plt.plot(data['value_log'])
+plt.title('Log Transformation')
+
+plt.subplot(6, 1, 5)
+plt.plot(data['value_log_diff'])
+plt.title('Log + Differencing')
+
+plt.subplot(6, 1, 6)
+plt.plot(data['value_log_seasonal_diff'])
+plt.title('Final Stationary (Log + Seasonal Diff)')
+
+plt.tight_layout()
+plt.show()
+```
 
 ### OUTPUT:
 
+<img width="700" height="77" alt="image" src="https://github.com/user-attachments/assets/e875c383-34a4-4965-8ea1-9256398561d9" />
 
 REGULAR DIFFERENCING:
 
+<img width="1227" height="210" alt="image" src="https://github.com/user-attachments/assets/948c7e89-67e9-493a-8b47-542e5c1037b0" />
 
 SEASONAL ADJUSTMENT:
 
+<img width="1257" height="202" alt="image" src="https://github.com/user-attachments/assets/f5d31b6a-5cef-4ee0-b9bc-8ef1ec7484dc" />
 
 LOG TRANSFORMATION:
 
-
+<img width="1211" height="205" alt="image" src="https://github.com/user-attachments/assets/66c35a04-c97c-4488-b77c-234d3ccabeb1" />
 
 ### RESULT:
 Thus we have created the python code for the conversion of non stationary to stationary data on international airline passenger
